@@ -28,8 +28,8 @@
         </geometry>
         <material>
           <script>
-            <uri>file://Media/materials/scripts/sand.material</uri>
-            <name>UUVSimulator/SandAndStones</name>
+            <uri>file://Media/materials/scripts/walls.material</uri>
+            <name>UUVSimulator/Walls</name>
           </script>
         </material>
       </visual>
@@ -69,8 +69,8 @@
         </geometry>
         <material>
           <script>
-            <uri>file://Media/materials/scripts/water.material</uri>
-            <name>UUVSimulator/SeaWall</name>
+            <uri>file://Media/materials/scripts/walls.material</uri>
+            <name>UUVSimulator/Walls</name>
           </script>
         </material>
       </visual>
@@ -85,8 +85,8 @@
         </geometry>
         <material>
           <script>
-            <uri>file://Media/materials/scripts/water.material</uri>
-            <name>UUVSimulator/SeaWall</name>
+            <uri>file://Media/materials/scripts/walls.material</uri>
+            <name>UUVSimulator/Walls</name>
           </script>
         </material>
       </visual>
@@ -101,8 +101,8 @@
         </geometry>
         <material>
           <script>
-            <uri>file://Media/materials/scripts/water.material</uri>
-            <name>UUVSimulator/SeaWall</name>
+            <uri>file://Media/materials/scripts/walls.material</uri>
+            <name>UUVSimulator/Walls</name>
           </script>
         </material>
       </visual>
@@ -117,8 +117,8 @@
         </geometry>
         <material>
           <script>
-            <uri>file://Media/materials/scripts/water.material</uri>
-            <name>UUVSimulator/SeaWall</name>
+            <uri>file://Media/materials/scripts/walls.material</uri>
+            <name>UUVSimulator/Walls</name>
           </script>
         </material>
       </visual>

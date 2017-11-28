@@ -1,4 +1,4 @@
-material UUVSimulator/SandAndStones
+material UUVSimulator/Walls
 {
   receive_shadows on
   technique
@@ -13,10 +13,10 @@ material UUVSimulator/SandAndStones
 
       texture_unit
       {
-      texture Pool_wall.jpg
-      filtering anistropic
-      max_anisotropy 16
-      scale 0.5 0.5
+        texture Pool_wall.jpg
+        filtering anistropic
+        max_anisotropy 16
+        scale 0.5 0.5
       }
     }
   }
