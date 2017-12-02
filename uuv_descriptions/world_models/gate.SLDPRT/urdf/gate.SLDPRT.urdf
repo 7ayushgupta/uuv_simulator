@@ -1,0 +1,45 @@
+<robot
+  name="gate.SLDPRT">
+  <link
+    name="gate.SLDPRT">
+    <inertial>
+      <origin
+        xyz="0.90303 -1.4384 0.93518"
+        rpy="0 0 0" />
+      <mass
+        value="19.44" />
+      <inertia
+        ixx="4.735584"
+        ixy="7.90383383743101E-20"
+        ixz="7.00239866091579E-16"
+        iyy="13.633704"
+        iyz="-2.89683413975256E-16"
+        izz="8.903304" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="1.5707963267949 0 0" />
+      <geometry>
+        <mesh
+          filename="package://gate.SLDPRT/meshes/gate.SLDPRT.STL" />
+      </geometry>
+
+      <material
+        name="gate.SLDPRT">
+        <color
+          rgba="1 0 0 1" />
+      </material>
+
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="1.5707963267949 0 0" />
+      <geometry>
+        <mesh
+          filename="package://gate.SLDPRT/meshes/gate.SLDPRT.STL" />
+      </geometry>
+    </collision>
+  </link>
+</robot>

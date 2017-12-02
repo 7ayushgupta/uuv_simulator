@@ -1,0 +1,43 @@
+<robot
+  name="pole-pinger.SLDPRT">
+  <link
+    name="pole-pinger.SLDPRT">
+    <inertial>
+      <origin
+        xyz="0.46114 -0.93656 0.17749"
+        rpy="0 0 0" />
+      <mass
+        value="9.4154" />
+      <inertia
+        ixx="1.16532765276514"
+        ixy="0.000212016621517814"
+        ixz="0.00401398270914774"
+        iyy="1.16547416283889"
+        iyz="-0.00285993253685196"
+        izz="0.0426554959070848" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="1.5707963267949 0 0" />
+      <geometry>
+        <mesh
+          filename="package://pole-pinger.SLDPRT/meshes/pole-pinger.SLDPRT.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="1.5707963267949 0 0" />
+      <geometry>
+        <mesh
+          filename="package://pole-pinger.SLDPRT/meshes/pole-pinger.SLDPRT.STL" />
+      </geometry>
+    </collision>
+  </link>
+</robot>

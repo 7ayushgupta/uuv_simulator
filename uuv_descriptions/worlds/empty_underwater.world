@@ -69,8 +69,38 @@
     </include>
 
     <include>
-      <uri>model://gate</uri>
-      <pose>0 0 -3 0 0 -1.57</pose>
+      <uri>model://gate.SLDPRT</uri>
+      <pose>12 0 -3 0 0 -1.57</pose>
+    </include>
+
+    <include>
+      <uri>model://green mat.SLDPRT</uri>
+      <pose>17 0 -3 0 0 -1.57</pose>
+    </include>
+
+    <include>
+      <uri>model://pole-pinger.SLDPRT</uri>
+      <pose>-12 0 -3 0 0 -1.57</pose>
+    </include>
+
+    <include>
+        <uri>model://bucket.SLDPRT</uri>
+        <pose>0 0 -1.5 0 0 -1.57</pose>
+      </include>
+
+    <include>
+          <uri>model://bucket1.SLDPRT</uri>
+          <pose>0 -2 -1.5 0 0 -1.57</pose>
+        </include>
+
+      <include>
+            <uri>model://bucket2.SLDPRT</uri>
+            <pose>0 2 -3 -1.57 0 0</pose>
+          </include>
+
+    <include>
+      <uri>model://golf ball.SLDPRT</uri>
+      <pose>-12 0 -1.48 0 0 -1.57</pose>
     </include>
 
     <plugin name="underwater_current_plugin" filename="libuuv_underwater_current_ros_plugin.so">
