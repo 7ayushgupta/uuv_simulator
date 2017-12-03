@@ -1,7 +1,7 @@
 <robot
-  name="bucket2.SLDPRT">
+  name="bucket3.SLDPRT">
   <link
-    name="bucket2.SLDPRT">
+    name="bucket3.SLDPRT">
     <inertial>
       <origin
         xyz="1.6389E-31 -8.31828789402452E-16 0.074656"
@@ -22,12 +22,13 @@
         rpy="1.5707963267949 0 0" />
       <geometry>
         <mesh
-          filename="package://bucket2.SLDPRT/meshes/bucket.SLDPRT.STL" />
+          filename="package://bucket3.SLDPRT/meshes/bucket3.SLDPRT.STL" />
       </geometry>
       <material
-        name="">
+        name="bucket3.SLDPRT">
         <color
-          rgba="0.89804 0.91765 0.92941 1" />
+          rgba="1.0 0.0 0.0 1" />
+
       </material>
     </visual>
     <collision>
@@ -36,14 +37,14 @@
         rpy="1.5707963267949 0 0" />
       <geometry>
         <mesh
-          filename="package://bucket2.SLDPRT/meshes/bucket.SLDPRT.STL" />
+          filename="package://bucket3.SLDPRT/meshes/bucket3.SLDPRT.STL" />
       </geometry>
     </collision>
   </link>
-  <gazebo reference="bucket2.SLDPRT">
+  <gazebo reference="bucket3.SLDPRT">
     <material>Gazebo/Red</material>
-    </gazebo>
-    <gazebo>
-    <static>true</static>
+</gazebo>
+<gazebo>
+<static>true</static>
 </gazebo>
 </robot>

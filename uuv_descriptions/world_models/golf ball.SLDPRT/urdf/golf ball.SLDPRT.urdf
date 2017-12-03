@@ -40,4 +40,10 @@
       </geometry>
     </collision>
   </link>
+  <gazebo reference="golf ball.SLDPRT">
+    <material>Gazebo/White</material>
+    </gazebo>
+    <!-- <gazebo>
+    <static>true</static>
+</gazebo> -->
 </robot>

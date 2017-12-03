@@ -69,13 +69,23 @@
     </include>
 
     <include>
-      <uri>model://gate.SLDPRT</uri>
-      <pose>12 0 -3 0 0 -1.57</pose>
+      <uri>model://gate_black.SLDPRT</uri>
+      <pose>12 0.73 -1.43 0 0 -1.57</pose>
+    </include>
+
+    <include>
+      <uri>model://gate_green.SLDPRT</uri>
+      <pose>12 0.75 -2.95 -1.57 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://gate_red.SLDPRT</uri>
+      <pose>12 -0.75 -2.95 -1.57 0 0</pose>
     </include>
 
     <include>
       <uri>model://green mat.SLDPRT</uri>
-      <pose>17 0 -3 0 0 -1.57</pose>
+      <pose>0 0 -2.95 0 0 -1.57</pose>
     </include>
 
     <include>
@@ -85,22 +95,27 @@
 
     <include>
         <uri>model://bucket.SLDPRT</uri>
-        <pose>0 0 -1.5 0 0 -1.57</pose>
+        <pose>0 -1.6 -2.94 0 0 -1.57</pose>
       </include>
 
     <include>
           <uri>model://bucket1.SLDPRT</uri>
-          <pose>0 -2 -1.5 0 0 -1.57</pose>
+          <pose>0 -3.2 -2.94 0 0 -1.57</pose>
         </include>
 
       <include>
             <uri>model://bucket2.SLDPRT</uri>
-            <pose>0 2 -3 -1.57 0 0</pose>
+            <pose>0 0.8 -2.94 0 0 -1.57</pose>
+          </include>
+
+      <include>
+            <uri>model://bucket3.SLDPRT</uri>
+            <pose>0 2.4 -2.94 0 0 -1.57</pose>
           </include>
 
     <include>
       <uri>model://golf ball.SLDPRT</uri>
-      <pose>-12 0 -1.48 0 0 -1.57</pose>
+      <pose>-12.94 -0.456 -1.787 0 0 -1.57</pose>
     </include>
 
     <plugin name="underwater_current_plugin" filename="libuuv_underwater_current_ros_plugin.so">

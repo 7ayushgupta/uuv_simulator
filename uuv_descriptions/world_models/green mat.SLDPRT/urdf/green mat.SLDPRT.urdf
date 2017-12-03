@@ -40,4 +40,10 @@
       </geometry>
     </collision>
   </link>
+  <gazebo reference="green mat.SLDPRT">
+    <material>Gazebo/Green</material>
+    </gazebo>
+    <gazebo>
+    <static>true</static>
+</gazebo>
 </robot>

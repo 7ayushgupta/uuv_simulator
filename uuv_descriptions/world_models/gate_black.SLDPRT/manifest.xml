@@ -1,10 +1,10 @@
 <package>
-  <name>gate.SLDPRT</name>
+  <name>rod146.SLDPRT</name>
   <version>1.0.0</version>
   <description>
-    <p>URDF Description package for gate.SLDPRT</p>
+    <p>URDF Description package for rod146.SLDPRT</p>
     <p>This package contains configuration data, 3D models and launch files
-for gate.SLDPRT robot</p>
+for rod146.SLDPRT robot</p>
   </description>
   <author>me</author>
   <maintainer email="me2email.com" />

@@ -25,9 +25,10 @@
           filename="package://bucket.SLDPRT/meshes/bucket.SLDPRT.STL" />
       </geometry>
       <material
-        name="">
+        name="bucket.SLDPRT">
         <color
-          rgba="0.89804 0.91765 0.92941 1" />
+          rgba="1.0 0.0 0.0 1" />
+
       </material>
     </visual>
     <collision>
@@ -40,4 +41,10 @@
       </geometry>
     </collision>
   </link>
+  <gazebo reference="bucket.SLDPRT">
+    <material>Gazebo/Blue</material>
+</gazebo>
+<gazebo>
+<static>true</static>
+</gazebo>
 </robot>
