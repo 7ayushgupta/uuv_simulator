@@ -19,8 +19,11 @@ import numpy as np
 import rospy
 import logging
 import sys
-from geometry_msgs.msg import Wrench, PoseStamped, TwistStamped, Vector3, \
-    Quaternion, Pose
+import tf
+from rospy.numpy_msg import numpy_msg
+from geometry_msgs.msg import WrenchStamped, PoseStamped, TwistStamped, \
+    Vector3, Quaternion, Pose
+from uuv_auv_control_allocator.msg import AUVCommand
 from std_msgs.msg import Time
 from nav_msgs.msg import Odometry
 from uuv_control_interfaces.vehicle import Vehicle
@@ -48,7 +51,8 @@ class DPControllerBase(object):
         self._is_init = False
         self._logger = logging.getLogger('dp_controller')
         out_hdlr = logging.StreamHandler(sys.stdout)
-        out_hdlr.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(module)s | %(message)s'))
+        out_hdlr.setFormatter(logging.Formatter(
+            rospy.get_namespace().replace('/', '').upper() + ' -- %(asctime)s | %(levelname)s | %(module)s | %(message)s'))
         out_hdlr.setLevel(logging.INFO)
         self._logger.addHandler(out_hdlr)
         self._logger.setLevel(logging.INFO)
@@ -68,32 +72,44 @@ class DPControllerBase(object):
         if rospy.has_param('~use_stamped_poses_only'):
             self._use_stamped_poses_only = rospy.get_param('~use_stamped_poses_only')
 
-        # Instance of the local planner for local trajectory generation
-        self._local_planner = LocalPlanner(full_dof=planner_full_dof,
-                                           stamped_pose_only=self._use_stamped_poses_only)
+        # Flag indicating if the vehicle has only thrusters, otherwise
+        # the AUV allocation node will be used
+        self.thrusters_only = rospy.get_param('~thrusters_only', True)
 
-        # Instance of the vehicle model
-        self._vehicle_model = None
-        # If list of callbacks is empty, set the default
-        if len(list_odometry_callbacks):
-            self._odometry_callbacks = list_odometry_callbacks
-        else:
-            self._odometry_callbacks = [self.update_errors,
-                                        self.update_controller]
-        # Initialize vehicle, if model based
-        self._create_vehicle_model()
+        # Instance of the local planner for local trajectory generation
+        self._local_planner = LocalPlanner(
+            full_dof=planner_full_dof,
+            stamped_pose_only=self._use_stamped_poses_only,
+            thrusters_only=self.thrusters_only)
 
         self._control_saturation = 5000
-
+        # TODO: Fix the saturation term and how it is applied
         if rospy.has_param('~saturation'):
             self._thrust_saturation = rospy.get_param('~saturation')
             if self._control_saturation <= 0:
                 raise rospy.ROSException('Invalid control saturation forces')
 
+        # Flag indicating either use of the AUV control allocator or
+        # direct command of fins and thruster
+        self.use_auv_control_allocator = False
+        if not self.thrusters_only:
+            self.use_auv_control_allocator = rospy.get_param('~use_auv_control_allocator', False)
+
         # Remap the following topics, if needed
         # Publisher for thruster allocator
-        self._thrust_pub = rospy.Publisher('thruster_output',
-                                           Wrench, queue_size=1)
+        if self.thrusters_only:
+            self._thrust_pub = rospy.Publisher(
+                'thruster_output', WrenchStamped, queue_size=1)
+        else:
+            self._thrust_pub = None
+
+        if not self.thrusters_only:
+            self._auv_command_pub = rospy.Publisher(
+                'auv_command_output', AUVCommand, queue_size=1)
+        else:
+            self._auv_command_pub = None
+
+        self._min_thrust = rospy.get_param('~min_thrust', 40.0)
 
         self._reference_pub = rospy.Publisher('reference',
                                               TrajectoryPoint,
@@ -127,6 +143,23 @@ class DPControllerBase(object):
         # Time stamp for the received trajectory
         self._stamp_trajectory_received = rospy.get_time()
 
+        # Instance of the vehicle model
+        self._vehicle_model = None
+        # If list of callbacks is empty, set the default
+        if len(list_odometry_callbacks):
+            self._odometry_callbacks = list_odometry_callbacks
+        else:
+            self._odometry_callbacks = [self.update_errors,
+                                        self.update_controller]
+        # Initialize vehicle, if model based
+        self._create_vehicle_model()
+        # Flag to indicate that odometry topic is receiving data
+        self._init_odom = False
+
+        # Subscribe to odometry topic
+        self._odom_topic_sub = rospy.Subscriber(
+            'odom', numpy_msg(Odometry), self._odometry_callback)
+
         # Stores last simulation time
         self._prev_t = -1.0
         self._logger.info('DP controller successfully initialized')
@@ -156,7 +189,7 @@ class DPControllerBase(object):
 
     @property
     def odom_is_init(self):
-        return self._vehicle_model.odom_is_init
+        return self._init_odom
 
     @property
     def error_pos_world(self):
@@ -164,7 +197,7 @@ class DPControllerBase(object):
 
     @property
     def error_orientation_quat(self):
-        return deepcopy(self._errors['rot'])
+        return deepcopy(self._errors['rot'][0:3])
 
     @property
     def error_orientation_rpy(self):
@@ -215,7 +248,8 @@ class DPControllerBase(object):
         """
         if self._vehicle_model is not None:
             del self._vehicle_model
-        self._vehicle_model = Vehicle(self._odometry_callbacks)
+        self._vehicle_model = Vehicle(
+            inertial_frame_id=self._local_planner.inertial_frame_id)
 
     def _update_reference(self):
         # Update the local planner's information about the vehicle's pose
@@ -224,16 +258,19 @@ class DPControllerBase(object):
 
         t = rospy.get_time()
         reference = self._local_planner.interpolate(t)
+
         if reference is not None:
             self._reference['pos'] = reference.p
             self._reference['rot'] = reference.q
             self._reference['vel'] = np.hstack((reference.v, reference.w))
             self._reference['acc'] = np.hstack((reference.a, reference.alpha))
-
+            # print '------------------ REFERENCE\n'
+            # print reference
+        if reference is not None and self._reference_pub.get_num_connections() > 0:
             # Publish current reference
             msg = TrajectoryPoint()
             msg.header.stamp = rospy.Time.now()
-            msg.header.frame_id = 'world'
+            msg.header.frame_id = self._local_planner.inertial_frame_id
             msg.pose.position = Vector3(*self._reference['pos'])
             msg.pose.orientation = Quaternion(*self._reference['rot'])
             msg.velocity.linear = Vector3(*self._reference['vel'][0:3])
@@ -288,7 +325,7 @@ class DPControllerBase(object):
             self._errors['pos'] = np.dot(
                 rotItoB, self._reference['pos'] - pos)
 
-            # Update orientation error with respect to the BODY frame
+            # Update orientation error
             self._errors['rot'] = quaternion_multiply(
                 quaternion_inverse(quat), self._reference['rot'])
 
@@ -297,21 +334,23 @@ class DPControllerBase(object):
                 np.dot(rotItoB, self._reference['vel'][0:3]) - vel[0:3],
                 np.dot(rotItoB, self._reference['vel'][3:6]) - vel[3:6]))
 
-        stamp = rospy.Time.now()
-        msg = TrajectoryPoint()
-        msg.header.stamp = stamp
-        msg.header.frame_id = 'world'
-        # Publish pose error
-        msg.pose.position = Vector3(*np.dot(rotBtoI, self._errors['pos']))
-        msg.pose.orientation = Quaternion(*self._errors['rot'])
-        # Publish velocity errors in INERTIAL frame
-        msg.velocity.linear = Vector3(*np.dot(rotBtoI, self._errors['vel'][0:3]))
-        msg.velocity.angular = Vector3(*np.dot(rotBtoI, self._errors['vel'][3:6]))
-        self._error_pub.publish(msg)
+        if self._error_pub.get_num_connections() > 0:
+            stamp = rospy.Time.now()
+            msg = TrajectoryPoint()
+            msg.header.stamp = stamp
+            msg.header.frame_id = self._local_planner.inertial_frame_id
+            # Publish pose error
+            msg.pose.position = Vector3(*np.dot(rotBtoI, self._errors['pos']))
+            msg.pose.orientation = Quaternion(*self._errors['rot'])
+            # Publish velocity errors in INERTIAL frame
+            msg.velocity.linear = Vector3(*np.dot(rotBtoI, self._errors['vel'][0:3]))
+            msg.velocity.angular = Vector3(*np.dot(rotBtoI, self._errors['vel'][3:6]))
+            self._error_pub.publish(msg)
 
     def publish_control_wrench(self, force):
         if not self.odom_is_init:
             return
+
         # Apply saturation
         for i in range(6):
             if force[i] < -self._control_saturation:
@@ -319,13 +358,50 @@ class DPControllerBase(object):
             elif force[i] > self._control_saturation:
                 force[i] = self._control_saturation
 
-        force_msg = Wrench()
-        force_msg.force.x = force[0]
-        force_msg.force.y = force[1]
-        force_msg.force.z = force[2]
+        if not self.thrusters_only:
+            surge_speed = self._vehicle_model.vel[0]
+            self.publish_auv_command(surge_speed, force)
+            return
 
-        force_msg.torque.x = force[3]
-        force_msg.torque.y = force[4]
-        force_msg.torque.z = force[5]
+        force_msg = WrenchStamped()
+        force_msg.header.stamp = rospy.Time.now()
+        force_msg.header.frame_id = '%s/%s' % (self._namespace, self._vehicle_model.body_frame_id)
+        force_msg.wrench.force.x = force[0]
+        force_msg.wrench.force.y = force[1]
+        force_msg.wrench.force.z = force[2]
+
+        force_msg.wrench.torque.x = force[3]
+        force_msg.wrench.torque.y = force[4]
+        force_msg.wrench.torque.z = force[5]
 
         self._thrust_pub.publish(force_msg)
+
+    def publish_auv_command(self, surge_speed, wrench):
+        if not self.odom_is_init:
+            return
+
+        surge_speed = max(0, surge_speed)
+
+        msg = AUVCommand()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = '%s/%s' % (self._namespace, self._vehicle_model.body_frame_id)
+        msg.surge_speed = surge_speed
+        msg.command.force.x = max(self._min_thrust, wrench[0])
+        msg.command.force.y = wrench[1]
+        msg.command.force.z = wrench[2]
+        msg.command.torque.x = wrench[3]
+        msg.command.torque.y = wrench[4]
+        msg.command.torque.z = wrench[5]
+
+        self._auv_command_pub.publish(msg)
+
+    def _odometry_callback(self, msg):
+        """Odometry topic subscriber callback function."""
+        self._vehicle_model.update_odometry(msg)
+
+        if not self._init_odom:
+            self._init_odom = True        
+
+        if len(self._odometry_callbacks):
+            for func in self._odometry_callbacks:
+                func()

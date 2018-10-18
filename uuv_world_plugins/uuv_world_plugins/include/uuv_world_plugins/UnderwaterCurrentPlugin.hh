@@ -30,7 +30,9 @@
 
 namespace gazebo
 {
-  /// \brief Class for the underwater world plugin
+  /// \brief Class for the underwater current plugin
+  /// TODO: Add option to make the underwater current also a function of depth
+  ///       to comply with DNV
   class UnderwaterCurrentPlugin : public WorldPlugin
   {
     /// \brief Class constructor
@@ -91,7 +93,7 @@ namespace gazebo
     protected: common::Time lastUpdate;
 
     /// \brief Current linear velocity vector
-    protected: gazebo::math::Vector3 currentVelocity;
+    protected: ignition::math::Vector3d currentVelocity;
   };
 }
 

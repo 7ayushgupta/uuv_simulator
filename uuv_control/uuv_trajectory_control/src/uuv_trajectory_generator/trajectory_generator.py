@@ -20,8 +20,9 @@ from geometry_msgs.msg import Vector3, PoseStamped, Quaternion
 import uuv_control_msgs.msg as uuv_control_msgs
 from nav_msgs.msg import Path
 from .wp_trajectory_generator import WPTrajectoryGenerator
-from .waypoint_set import WaypointSet
+from uuv_waypoints import WaypointSet
 from .trajectory_point import TrajectoryPoint
+from tf.transformations import euler_from_quaternion
 
 
 class TrajectoryGenerator(object):
@@ -32,19 +33,22 @@ class TrajectoryGenerator(object):
         self._is_full_dof = full_dof
         self._stamped_pose_only = stamped_pose_only
         self._wp_interp_on = False
-        self._wp_interp = WPTrajectoryGenerator(full_dof=full_dof, stamped_pose_only=stamped_pose_only)
+        self._wp_interp = WPTrajectoryGenerator(
+            full_dof=full_dof, stamped_pose_only=stamped_pose_only)
 
         self._has_started = False
         self._is_finished = False
 
     @property
     def points(self):
-        if self._points is not None:
-            return self._points
-        elif self._wp_interp_on:
-            return self._wp_interp.get_samples(0.005)
+        if self._wp_interp_on:
+            return self._wp_interp.get_samples(0.001)
         else:
-            return None
+            return self._points
+
+    @property
+    def time(self):
+        return self._time
 
     def use_finite_diff(self, flag):
         self._wp_interp.use_finite_diff = flag
@@ -56,13 +60,25 @@ class TrajectoryGenerator(object):
         self._wp_interp.stamped_pose_only = flag
 
     def is_using_stamped_pose_only(self):
-        return self._wp_interp.stamped_pose_only 
+        return self._wp_interp.stamped_pose_only
 
     def set_interp_method(self, method):
         return self._wp_interp.set_interpolation_method(method)
 
     def get_interp_method(self):
         return self._wp_interp.get_interpolation_method()
+
+    def get_interpolator_tags(self):
+        return self._wp_interp.interpolator_tags
+
+    def set_interpolator_parameters(self, method, params):
+        return self._wp_interp.set_interpolator_parameters(method, params)
+
+    def get_visual_markers(self):
+        if self._wp_interp_on:
+            return self._wp_interp.get_visual_markers()
+        else:
+            return None
 
     def _reset(self):
         self._points = None
@@ -77,28 +93,31 @@ class TrajectoryGenerator(object):
         are currently in use, then sample the interpolated path and return the
         poses only.
         """
-        
-        try:
-            if self.points is None:
-                return None
-            msg = uuv_control_msgs.Trajectory()
-            msg.header.stamp = rospy.Time.now()
-            msg.header.frame_id = 'world'
-            for pnt in self.points:
-                # FIXME Sometimes the time stamp of the point is NaN
-                msg.points.append(pnt.to_message())
-            return msg
-        except:
-            print 'Error during creation of trajectory message'
+
+        # try:
+        if self.points is None:
             return None
+        msg = uuv_control_msgs.Trajectory()
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = 'world'
+        for pnt in self.points:
+            # FIXME Sometimes the time stamp of the point is NaN
+            msg.points.append(pnt.to_message())
+        return msg
+        # except Exception, e:
+        #     print 'Error during creation of trajectory message, msg=' + str(e)
+        #     return None
 
     def is_using_waypoints(self):
         """Return true if the waypoint interpolation is being used."""
         return self._wp_interp_on
 
-    def set_waypoints(self, waypoints):
+    def set_waypoints(self, waypoints, init_rot=(0, 0, 0, 1)):
         """Initializes the waypoint interpolator with a set of waypoints."""
-        if self._wp_interp.init_waypoints(waypoints):
+        rospy.loginfo('Initial rotation vector (quat)=%s', str(init_rot))
+        rospy.loginfo('Initial rotation vector (rpy)=%s',
+                      str(euler_from_quaternion(init_rot)))
+        if self._wp_interp.init_waypoints(waypoints, init_rot):
             self._wp_interp_on = True
             return True
         else:
@@ -111,6 +130,7 @@ class TrajectoryGenerator(object):
         """
 
         if not self.is_using_waypoints():
+            rospy.loginfo('NOT USING WAYPOINTS')
             return None
         return self._wp_interp.get_waypoints()
 
@@ -140,7 +160,8 @@ class TrajectoryGenerator(object):
             self._time.append(pnt.t)
             return True
         else:
-            print 'Cannot add trajectory point! Generator is in waypoint interpolation mode!'
+            rospy.logerr('Cannot add trajectory point! Generator is in '
+                         'waypoint interpolation mode!')
             return False
 
     def add_trajectory_point_from_msg(self, msg):
@@ -150,15 +171,16 @@ class TrajectoryGenerator(object):
                 self.add_trajectory_point(pnt)
                 return True
             else:
-                print 'Error converting message to trajectory point'
+                rospy.logerr('Error converting message to trajectory point')
                 return False
         else:
-            print 'Cannot add trajectory point! Generator is in waypoint interpolation mode!'
+            rospy.logerr('Cannot add trajectory point! Generator is in '
+                         'waypoint interpolation mode!')
             return False
 
     def set_duration(self, t):
         if not self._wp_interp_on:
-            print 'Waypoint interpolation is not activated'
+            rospy.logerr('Waypoint interpolation is not activated')
             return False
         else:
             return self._wp_interp.set_duration(t)
@@ -199,7 +221,8 @@ class TrajectoryGenerator(object):
                 last_t = t
             else:
                 if t <= last_t:
-                    print 'Trajectory should be given a growing value of time'
+                    rospy.logerr('Trajectory should be given a growing value '
+                                 'of time')
                     self._reset()
                     return False
             self.add_trajectory_point_from_msg(p_msg)
@@ -270,7 +293,13 @@ class TrajectoryGenerator(object):
             return True
         return False
 
-    def interpolate(self, t):
+    def generate_reference(self, t, *args):
+        if self._wp_interp_on:
+            return self._wp_interp.generate_reference(t, *args)
+        else:
+            return None
+
+    def interpolate(self, t, *args):
         if not self._wp_interp_on:
             self._this_pnt = TrajectoryPoint()
             if self._points is None:
@@ -314,6 +343,6 @@ class TrajectoryGenerator(object):
                     self._this_pnt.vel = w0*p_last.vel + w1*p_this.vel
                     self._this_pnt.acc = w0*p_last.acc + w1*p_this.acc
         else:
-            self._this_pnt = self._wp_interp.interpolate(t)
+            self._this_pnt = self._wp_interp.interpolate(t, *args)
 
         return self._this_pnt

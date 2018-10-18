@@ -18,8 +18,15 @@ import numpy as np
 from nav_msgs.msg import Odometry
 from copy import deepcopy
 from rospy.numpy_msg import numpy_msg
+import tf2_ros
 from tf.transformations import quaternion_from_euler, euler_from_quaternion, \
     quaternion_matrix, rotation_matrix, is_same_transform
+
+try: 
+    import casadi
+    casadi_exists = True
+except ImportError:
+    casadi_exists = False
 
 
 def cross_product_operator(x):
@@ -38,14 +45,42 @@ class Vehicle(object):
 
     INSTANCE = None
 
-    def __init__(self, list_odometry_callbacks=list(), sub_to_odometry=True):
+    def __init__(self, inertial_frame_id='world'):
         """Class constructor."""
+        assert inertial_frame_id in ['world', 'world_ned']
         # Reading current namespace
         self._namespace = rospy.get_namespace()
 
-        # Load the list of callback function handles to be called in the
-        # odometry callback
-        self._list_callbacks = list_odometry_callbacks
+        self._inertial_frame_id = inertial_frame_id
+        self._body_frame_id = None
+
+        if self._inertial_frame_id == 'world':
+            self._body_frame_id = 'base_link'
+        else:
+            self._body_frame_id = 'base_link_ned'
+
+        tf_buffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tf_buffer)
+        tf_trans_ned_to_enu = None
+        try:
+            tf_trans_ned_to_enu = tf_buffer.lookup_transform(
+                'world', 'world_ned', rospy.Time(),
+                rospy.Duration(1))
+        except Exception, e:
+            self._logger.error('No transform found between world and the '
+                               'world_ned ' + self.namespace)
+            self._logger.error(str(e))
+            self.transform_ned_to_enu = None
+
+        if tf_trans_ned_to_enu is not None:
+            self.transform_ned_to_enu = quaternion_matrix(
+                (tf_trans_ned_to_enu.transform.rotation.x,
+                 tf_trans_ned_to_enu.transform.rotation.y,
+                 tf_trans_ned_to_enu.transform.rotation.z,
+                 tf_trans_ned_to_enu.transform.rotation.w))[0:3, 0:3]
+
+        print('Transform world_ned (NED) to world (ENU)=\n' +
+              str(self.transform_ned_to_enu))
 
         self._mass = 0
         if rospy.has_param('~mass'):
@@ -177,16 +212,24 @@ class Vehicle(object):
         # Acceleration in the body frame
         self._acc = np.zeros(6)
         # Generalized forces
-        self._gen_forces = np.zeros(6)
-        # Flag to indicate that odometry topic is receiving data
-        self._init_odom = False
-        if sub_to_odometry:
-            # Subscribe to odometry topic
-            self._odom_topic_sub = rospy.Subscriber(
-                'odom', numpy_msg(Odometry), self._odometry_callback)
-        else:
-            self._init_odom = True
-            self._odom_topic_sub = None
+        self._gen_forces = np.zeros(6)        
+
+    @staticmethod
+    def q_to_matrix(q):
+        e1 = q[0]
+        e2 = q[1]
+        e3 = q[2]
+        eta = q[3]
+        R = np.array([[1 - 2 * (e2**2 + e3**2),
+                       2 * (e1 * e2 - e3 * eta),
+                       2 * (e1 * e3 + e2 * eta)],
+                      [2 * (e1 * e2 + e3 * eta),
+                       1 - 2 * (e1**2 + e3**2),
+                       2 * (e2 * e3 - e1 * eta)],
+                      [2 * (e1 * e3 - e2 * eta),
+                       2 * (e2 * e3 + e1 * eta),
+                       1 - 2 * (e1**2 + e2**2)]])
+        return R
 
     @property
     def namespace(self):
@@ -194,12 +237,28 @@ class Vehicle(object):
         return self._namespace
 
     @property
-    def odom_is_init(self):
-        return self._init_odom
+    def body_frame_id(self):
+        return self._body_frame_id
+
+    @property
+    def inertial_frame_id(self):
+        return self._inertial_frame_id
 
     @property
     def mass(self):
         return self._mass
+
+    @property
+    def volume(self):
+        return self._volume
+
+    @property
+    def gravity(self):
+        return self._gravity
+
+    @property
+    def density(self):
+        return self._density
 
     @property
     def height(self):
@@ -340,20 +399,7 @@ class Vehicle(object):
            to retrieve Euler angles from the quaternion vector (Fossen, 2011).
         """
         # Using the (x, y, z, w) format to describe quaternions
-        e1 = self._pose['rot'][0]
-        e2 = self._pose['rot'][1]
-        e3 = self._pose['rot'][2]
-        eta = self._pose['rot'][3]
-        R = np.array([[1 - 2 * (e2**2 + e3**2),
-                       2 * (e1 * e2 - e3 * eta),
-                       2 * (e1 * e3 + e2 * eta)],
-                      [2 * (e1 * e2 + e3 * eta),
-                       1 - 2 * (e1**2 + e3**2),
-                       2 * (e2 * e3 - e1 * eta)],
-                      [2 * (e1 * e3 - e2 * eta),
-                       2 * (e2 * e3 + e1 * eta),
-                       1 - 2 * (e1**2 + e2**2)]])
-        return R
+        return self.q_to_matrix(self._pose['rot'])
 
     @property
     def TItoBeuler(self):
@@ -393,17 +439,22 @@ class Vehicle(object):
         return T
 
     def to_SNAME(self, x):
+        if self._body_frame_id == 'base_link_ned':
+            return x
         try:
             if x.shape == (3,):
                 return np.array([x[0], -1 * x[1], -1 * x[2]])
             elif x.shape == (6,):
                 return np.array([x[0], -1 * x[1], -1 * x[2],
                                  x[3], -1 * x[4], -1 * x[5]])
-        except:
-            print('Invalid input vector, v=' + str(x))
+        except Exception, e:
+            self._logger.error('Invalid input vector, v=' + str(x))
+            self._logger.error('Message=' + str(e))
             return None
 
     def from_SNAME(self, x):
+        if self._body_frame_id == 'base_link_ned':
+            return x
         return self.to_SNAME(x)
 
     def print_info(self):
@@ -467,20 +518,25 @@ class Vehicle(object):
              [self._inertial['ixz'], self._inertial['iyz'],
               self._inertial['izz']]])
 
-    def _update_restoring(self, use_sname=False):
+    def _update_restoring(self, q=None, use_sname=False):
         """
         Update the restoring forces for the current orientation.
         """
-        Fg = np.array([0, 0, -self._mass * self._gravity])
-        Fb = np.array([0, 0, self._volume * self._gravity * self._density])
+        if use_sname:
+            Fg = np.array([0, 0, -self._mass * self._gravity])
+            Fb = np.array([0, 0, self._volume * self._gravity * self._density])
+        else:
+            Fg = np.array([0, 0, self._mass * self._gravity])
+            Fb = np.array([0, 0, -self._volume * self._gravity * self._density])
+        if q is not None:
+            rotItoB = self.q_to_matrix(q).T
+        else:
+            rotItoB = self.rotItoB   
         self._g = np.zeros(6)
 
-        self._g[0:3] = -1 * np.dot(self.rotItoB, Fg + Fb)
-        self._g[3:6] = -1 * np.dot(self.rotItoB,
-                                   np.cross(self._cog, Fg) + np.cross(self._cob, Fb))
-
-        if use_sname:
-            self._g = self.to_SNAME(self._g)
+        self._g[0:3] = -1 * np.dot(rotItoB, Fg + Fb)
+        self._g[3:6] = -1 * np.dot(rotItoB,
+                                   np.cross(self._cog, Fg) + np.cross(self._cob, Fb))        
 
     def set_added_mass(self, Ma):
         """Set added-mass matrix coefficients."""
@@ -579,11 +635,8 @@ class Vehicle(object):
         jac[0:3, 0:3] = self.rotBtoI
         jac[3:6, 3:6] = self.TBtoIeuler
         return jac
-
-    def add_odometry_callback(self, callback):
-        self._list_callbacks.append(callback)
-
-    def _odometry_callback(self, msg):
+    
+    def update_odometry(self, msg):
         """Odometry topic subscriber callback function."""
         # The frames of reference delivered by the odometry seems to be as
         # follows
@@ -591,6 +644,13 @@ class Vehicle(object):
         # orientation -> world frame
         # linear velocity -> world frame
         # angular velocity -> world frame
+
+        if self._inertial_frame_id != msg.header.frame_id:
+            raise rospy.ROSException('The inertial frame ID used by the '
+                                     'vehicle model does not match the '
+                                     'odometry frame ID, vehicle=%s, odom=%s' %
+                                     (self._inertial_frame_id,
+                                      msg.header.frame_id))
 
         # Update the velocity vector
         # Update the pose in the inertial frame
@@ -618,14 +678,3 @@ class Vehicle(object):
         # Store velocity vector
         self._vel = np.hstack((lin_vel, ang_vel))
 
-        if not self._init_odom:
-            self._init_odom = True
-
-        if len(self._list_callbacks):
-            for func in self._list_callbacks:
-                func()
-            try:
-                for func in self._list_callbacks:
-                    func()
-            except:
-                print 'Invalid callback function handle'

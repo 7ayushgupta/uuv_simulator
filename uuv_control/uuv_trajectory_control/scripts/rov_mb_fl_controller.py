@@ -26,19 +26,20 @@ class ROV_MBFLController(DPPIDControllerBase):
     Thor I. Fossen 2011
     Handbook of Marine Craft Hydrodynamics and Motion Control
     """
-    _LABEL = 'Modelbased Feedback Linearization Controller'
+    _LABEL = 'Model-based Feedback Linearization Controller'
 
     def __init__(self):
         DPPIDControllerBase.__init__(self, True)
-        self._logger.info('Initializing: Model-based feedback linearization'
-                          ' controller')
+        self._logger.info('Initializing: ' + self._LABEL)
 
         # Control forces and torques
         self._tau = np.zeros(6)
         # PID control vector
         self._pid_control = np.zeros(6)
         self._is_init = True
-        self._logger.info('Model-based feedback linearization controller ready')
+        self._last_vel = np.zeros(6)
+        self._last_t = None
+        self._logger.info(self._LABEL + ' ready')
 
     def _reset_controller(self):
         super(ROV_MBFLController, self).reset_controller()
@@ -49,19 +50,38 @@ class ROV_MBFLController(DPPIDControllerBase):
         if not self._is_init:
             return False
 
+        t = rospy.get_time()
+        if self._last_t is None:
+            self._last_t = t
+            self._last_vel = self._vehicle_model.to_SNAME(self._reference['vel']) 
+            return False
+
+        dt = t - self._last_t
+        if dt <= 0:
+            self._last_t = t
+            self._last_vel = self._vehicle_model.to_SNAME(self._reference['vel']) 
+            return False
         self._pid_control = self.update_pid()
 
-        vel = self._vehicle_model.to_SNAME(self._vehicle_model.vel)
+        
+        vel = self._vehicle_model.to_SNAME(self._reference['vel'])
+        acc = (vel - self._last_vel) / dt
+
         self._vehicle_model._update_damping(vel)
         self._vehicle_model._update_coriolis(vel)
-        self._vehicle_model._update_restoring(use_sname=True)
+        self._vehicle_model._update_restoring(q=self._reference['rot'], use_sname=True)
 
-        self._tau = np.dot(self._vehicle_model.Ctotal, vel) + \
+        self._tau = np.dot(self._vehicle_model.Mtotal, acc) + \
+                    np.dot(self._vehicle_model.Ctotal, vel) + \
                     np.dot(self._vehicle_model.Dtotal, vel) + \
                     self._vehicle_model.restoring_forces
+                    
         # Publish control forces and torques
         self.publish_control_wrench(self._pid_control + self._vehicle_model.from_SNAME(self._tau))
+        self._last_t = t
+        self._last_vel = self._vehicle_model.to_SNAME(self._reference['vel'])
         return True
+
 
 if __name__ == '__main__':
     print('Starting Modelbased Feedback Linearization Controller')

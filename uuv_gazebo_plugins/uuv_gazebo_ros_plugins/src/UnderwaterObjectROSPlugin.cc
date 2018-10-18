@@ -69,6 +69,96 @@ void UnderwaterObjectROSPlugin::Load(gazebo::physics::ModelPtr _parent,
       _parent->GetName() + "/set_use_global_current_velocity",
       &UnderwaterObjectROSPlugin::SetUseGlobalCurrentVel, this);
 
+  this->services["set_added_mass_scaling"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/set_added_mass_scaling",
+      &UnderwaterObjectROSPlugin::SetScalingAddedMass, this);
+
+  this->services["get_added_mass_scaling"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/get_added_mass_scaling",
+      &UnderwaterObjectROSPlugin::GetScalingAddedMass, this);
+
+  this->services["set_damping_scaling"] =
+    this->rosNode->advertiseService(
+        _parent->GetName() + "/set_damping_scaling",
+        &UnderwaterObjectROSPlugin::SetScalingDamping, this);
+
+  this->services["get_damping_scaling"] =
+    this->rosNode->advertiseService(
+        _parent->GetName() + "/get_damping_scaling",
+        &UnderwaterObjectROSPlugin::GetScalingDamping, this);
+
+  this->services["set_volume_scaling"] =
+    this->rosNode->advertiseService(
+        _parent->GetName() + "/set_volume_scaling",
+        &UnderwaterObjectROSPlugin::SetScalingVolume, this);
+
+  this->services["get_volume_scaling"] =
+    this->rosNode->advertiseService(
+        _parent->GetName() + "/get_volume_scaling",
+        &UnderwaterObjectROSPlugin::GetScalingVolume, this);
+
+  this->services["set_fluid_density"] =
+    this->rosNode->advertiseService(
+        _parent->GetName() + "/set_fluid_density",
+        &UnderwaterObjectROSPlugin::SetFluidDensity, this);
+
+  this->services["get_fluid_density"] =
+    this->rosNode->advertiseService(
+        _parent->GetName() + "/get_fluid_density",
+        &UnderwaterObjectROSPlugin::GetFluidDensity, this);
+
+  this->services["set_volume_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/set_volume_offset",
+      &UnderwaterObjectROSPlugin::SetOffsetVolume, this);
+
+  this->services["get_volume_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/get_volume_offset",
+      &UnderwaterObjectROSPlugin::GetOffsetVolume, this);
+
+  this->services["set_added_mass_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/set_added_mass_offset",
+      &UnderwaterObjectROSPlugin::SetOffsetAddedMass, this);
+
+  this->services["get_added_mass_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/get_added_mass_offset",
+      &UnderwaterObjectROSPlugin::GetOffsetAddedMass, this);
+
+  this->services["set_linear_damping_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/set_linear_damping_offset",
+      &UnderwaterObjectROSPlugin::SetOffsetLinearDamping, this);
+
+  this->services["get_linear_damping_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/get_linear_damping_offset",
+      &UnderwaterObjectROSPlugin::GetOffsetLinearDamping, this);
+
+  this->services["set_linear_forward_speed_damping_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/set_linear_forward_speed_damping_offset",
+      &UnderwaterObjectROSPlugin::SetOffsetLinearForwardSpeedDamping, this);
+
+  this->services["get_linear_forward_speed_damping_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/get_linear_forward_speed_damping_offset",
+      &UnderwaterObjectROSPlugin::GetOffsetLinearForwardSpeedDamping, this);
+
+  this->services["set_nonlinear_damping_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/set_nonlinear_damping_offset",
+      &UnderwaterObjectROSPlugin::SetOffsetNonLinearDamping, this);
+
+  this->services["get_nonlinear_damping_offset"] =
+    this->rosNode->advertiseService(
+      _parent->GetName() + "/get_nonlinear_damping_offset",
+      &UnderwaterObjectROSPlugin::GetOffsetNonLinearDamping, this);
+
   this->services["get_model_properties"] =
     this->rosNode->advertiseService(
       _parent->GetName() + "/get_model_properties",
@@ -85,6 +175,18 @@ void UnderwaterObjectROSPlugin::Load(gazebo::physics::ModelPtr _parent,
   this->rosHydroPub["is_submerged"] =
     this->rosNode->advertise<std_msgs::Bool>
     (_parent->GetName() + "/is_submerged", 0);
+
+  this->nedTransform.header.frame_id = this->model->GetName() + "/base_link";
+  this->nedTransform.child_frame_id = this->model->GetName() + "/base_link_ned";
+  this->nedTransform.transform.translation.x = 0;
+  this->nedTransform.transform.translation.y = 0;
+  this->nedTransform.transform.translation.z = 0;
+  tf2::Quaternion quat;
+  quat.setRPY(M_PI, 0, 0);
+  this->nedTransform.transform.rotation.x = quat.x();
+  this->nedTransform.transform.rotation.y = quat.y();
+  this->nedTransform.transform.rotation.z = quat.z();
+  this->nedTransform.transform.rotation.w = quat.w();
 }
 
 /////////////////////////////////////////////////
@@ -95,7 +197,15 @@ void UnderwaterObjectROSPlugin::Init()
 
 /////////////////////////////////////////////////
 void UnderwaterObjectROSPlugin::Reset()
+{ }
+
+/////////////////////////////////////////////////
+void UnderwaterObjectROSPlugin::Update(const gazebo::common::UpdateInfo &_info)
 {
+  UnderwaterObjectPlugin::Update(_info);
+
+  this->nedTransform.header.stamp = ros::Time::now();
+  this->tfBroadcaster.sendTransform(this->nedTransform);
 }
 
 /////////////////////////////////////////////////
@@ -129,12 +239,12 @@ void UnderwaterObjectROSPlugin::PublishRestoringForce(
     if (!this->models[_link]->GetDebugFlag())
       return;
 
-    gazebo::math::Vector3 restoring = this->models[_link]->GetStoredVector(
+    ignition::math::Vector3d restoring = this->models[_link]->GetStoredVector(
       RESTORING_FORCE);
 
     geometry_msgs::WrenchStamped msg;
     this->GenWrenchMsg(restoring,
-      gazebo::math::Vector3(0, 0, 0), msg);
+      ignition::math::Vector3d(0, 0, 0), msg);
     this->rosHydroPub[_link->GetName() + "/restoring"].publish(msg);
   }
 }
@@ -160,26 +270,29 @@ void UnderwaterObjectROSPlugin::PublishCurrentVelocityMarker()
   marker.type = visualization_msgs::Marker::ARROW;
   // Creating the arrow marker for the current velocity information
   // (orientation only, magnitude has to be read from the topic)
-  if (this->flowVelocity.GetLength() > 0)
+  if (this->flowVelocity.Length() > 0)
   {
     marker.action = visualization_msgs::Marker::ADD;
-
-    gazebo::math::Pose pose = this->model->GetWorldPose();
-
-    double yaw = std::atan2(this->flowVelocity.y, this->flowVelocity.x);
+    ignition::math::Pose3d pose;
+#if GAZEBO_MAJOR_VERSION >= 8
+    pose = this->model->WorldPose();
+#else
+    pose = this->model->GetWorldPose().Ign();
+#endif
+    double yaw = std::atan2(this->flowVelocity.Y(), this->flowVelocity.X());
     double pitch = std::atan2(
-      this->flowVelocity.z,
-      std::sqrt(std::pow(this->flowVelocity.x, 2) +
-        std::pow(this->flowVelocity.y, 2)));
+      this->flowVelocity.Z(),
+      std::sqrt(std::pow(this->flowVelocity.X(), 2) +
+        std::pow(this->flowVelocity.Y(), 2)));
 
-    gazebo::math::Quaternion qt(0.0, -pitch, yaw);
-    marker.pose.position.x = pose.pos.x;
-    marker.pose.position.y = pose.pos.y;
-    marker.pose.position.z = pose.pos.z + 1.5;
-    marker.pose.orientation.x = qt.x;
-    marker.pose.orientation.y = qt.y;
-    marker.pose.orientation.z = qt.z;
-    marker.pose.orientation.w = qt.w;
+    ignition::math::Quaterniond qt(0.0, -pitch, yaw);
+    marker.pose.position.x = pose.Pos().X();
+    marker.pose.position.y = pose.Pos().Y();
+    marker.pose.position.z = pose.Pos().Z() + 1.5;
+    marker.pose.orientation.x = qt.X();
+    marker.pose.orientation.y = qt.Y();
+    marker.pose.orientation.z = qt.Z();
+    marker.pose.orientation.w = qt.W();
     marker.scale.x = 1;
     marker.scale.y = 0.1;
     marker.scale.z = 0.1;
@@ -213,7 +326,7 @@ void UnderwaterObjectROSPlugin::PublishHydrodynamicWrenches(
     if (!this->models[_link]->GetDebugFlag())
       return;
     geometry_msgs::WrenchStamped msg;
-    gazebo::math::Vector3 force, torque;
+    ignition::math::Vector3d force, torque;
 
     // Publish wrench generated by the acceleration of fluid around the object
     force = this->models[_link]->GetStoredVector(UUV_ADDED_MASS_FORCE);
@@ -240,18 +353,21 @@ void UnderwaterObjectROSPlugin::PublishHydrodynamicWrenches(
 
 /////////////////////////////////////////////////
 void UnderwaterObjectROSPlugin::GenWrenchMsg(
-  gazebo::math::Vector3 _force, gazebo::math::Vector3 _torque,
+  ignition::math::Vector3d _force, ignition::math::Vector3d _torque,
   geometry_msgs::WrenchStamped &_output)
 {
-  _output.wrench.force.x = _force.x;
-  _output.wrench.force.y = _force.y;
-  _output.wrench.force.z = _force.z;
+  _output.wrench.force.x = _force.X();
+  _output.wrench.force.y = _force.Y();
+  _output.wrench.force.z = _force.Z();
 
-  _output.wrench.torque.x = _torque.x;
-  _output.wrench.torque.y = _torque.y;
-  _output.wrench.torque.z = _torque.z;
-
+  _output.wrench.torque.x = _torque.X();
+  _output.wrench.torque.y = _torque.Y();
+  _output.wrench.torque.z = _torque.Z();
+#if GAZEBO_MAJOR_VERSION >= 8
+  _output.header.stamp = ros::Time(this->world->SimTime().Double());
+#else
   _output.header.stamp = ros::Time(this->world->GetSimTime().Double());
+#endif
 }
 
 /////////////////////////////////////////////////
@@ -260,9 +376,9 @@ void UnderwaterObjectROSPlugin::UpdateLocalCurrentVelocity(
 {
   if (!this->useGlobalCurrent)
   {
-    this->flowVelocity.x = _msg->x;
-    this->flowVelocity.y = _msg->y;
-    this->flowVelocity.z = _msg->z;
+    this->flowVelocity.X() = _msg->x;
+    this->flowVelocity.Y() = _msg->y;
+    this->flowVelocity.Z() = _msg->z;
   }
 }
 
@@ -276,9 +392,9 @@ bool UnderwaterObjectROSPlugin::SetUseGlobalCurrentVel(
   else
   {
     this->useGlobalCurrent = _req.use_global;
-    this->flowVelocity.x = 0;
-    this->flowVelocity.y = 0;
-    this->flowVelocity.z = 0;
+    this->flowVelocity.X() = 0;
+    this->flowVelocity.Y() = 0;
+    this->flowVelocity.Z() = 0;
     if (this->useGlobalCurrent)
       gzmsg << this->model->GetName() <<
         "::Now using global current velocity" << std::endl;
@@ -342,7 +458,19 @@ bool UnderwaterObjectROSPlugin::GetModelProperties(
     model.cob.x = mat[0];
     model.cob.y = mat[1];
     model.cob.z = mat[2];
+#if GAZEBO_MAJOR_VERSION >= 8
+    model.inertia.m = link->GetInertial()->Mass();
+    model.inertia.ixx = link->GetInertial()->IXX();
+    model.inertia.ixy = link->GetInertial()->IXY();
+    model.inertia.ixz = link->GetInertial()->IXZ();
+    model.inertia.iyy = link->GetInertial()->IYY();
+    model.inertia.iyz = link->GetInertial()->IYZ();
+    model.inertia.izz = link->GetInertial()->IZZ();
 
+    model.inertia.com.x = link->GetInertial()->CoG().X();
+    model.inertia.com.y = link->GetInertial()->CoG().Y();
+    model.inertia.com.z = link->GetInertial()->CoG().Z();
+#else
     model.inertia.m = link->GetInertial()->GetMass();
     model.inertia.ixx = link->GetInertial()->GetIXX();
     model.inertia.ixy = link->GetInertial()->GetIXY();
@@ -354,9 +482,298 @@ bool UnderwaterObjectROSPlugin::GetModelProperties(
     model.inertia.com.x = link->GetInertial()->GetCoG().x;
     model.inertia.com.y = link->GetInertial()->GetCoG().y;
     model.inertia.com.z = link->GetInertial()->GetCoG().z;
-
+#endif
     _res.models.push_back(model);
   }
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetScalingAddedMass(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  if (_req.data < 0)
+  {
+    _res.success = false;
+    _res.message = "Scaling factor cannot be negative";
+  }
+  else
+  {
+    for (std::map<gazebo::physics::LinkPtr,
+       gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+       it != models.end(); ++it)
+    {
+      gazebo::HydrodynamicModelPtr hydro = it->second;
+      hydro->SetParam("scaling_added_mass", _req.data);
+    }
+    _res.success = true;
+    _res.message = "All links set with new added-mass scaling factor";
+  }
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetScalingAddedMass(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("scaling_added_mass", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetScalingDamping(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  if (_req.data < 0)
+  {
+    _res.success = false;
+    _res.message = "Scaling factor cannot be negative";
+  }
+  else
+  {
+    for (std::map<gazebo::physics::LinkPtr,
+       gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+       it != models.end(); ++it)
+    {
+      gazebo::HydrodynamicModelPtr hydro = it->second;
+      hydro->SetParam("scaling_damping", _req.data);
+    }
+    _res.success = true;
+    _res.message = "All links set with new damping scaling factor";
+  }
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetScalingDamping(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("scaling_damping", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetScalingVolume(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  if (_req.data < 0)
+  {
+    _res.success = false;
+    _res.message = "Scaling factor cannot be negative";
+  }
+  else
+  {
+    for (std::map<gazebo::physics::LinkPtr,
+       gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+       it != models.end(); ++it)
+    {
+      gazebo::HydrodynamicModelPtr hydro = it->second;
+      hydro->SetParam("scaling_volume", _req.data);
+    }
+    _res.success = true;
+    _res.message = "All links set with new volume scaling factor";
+  }
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetScalingVolume(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("scaling_volume", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetFluidDensity(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  if (_req.data < 0)
+  {
+    _res.success = false;
+    _res.message = "Scaling factor cannot be negative";
+  }
+  else
+  {
+    for (std::map<gazebo::physics::LinkPtr,
+       gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+       it != models.end(); ++it)
+    {
+      gazebo::HydrodynamicModelPtr hydro = it->second;
+      hydro->SetParam("fluid_density", _req.data);
+    }
+    _res.success = true;
+    _res.message = "All links set with new fluid density";
+  }
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetFluidDensity(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("fluid_density", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetOffsetVolume(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  for (std::map<gazebo::physics::LinkPtr,
+     gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+     it != models.end(); ++it)
+  {
+    gazebo::HydrodynamicModelPtr hydro = it->second;
+    hydro->SetParam("offset_volume", _req.data);
+  }
+  _res.success = true;
+  _res.message = "All links set with new volume offset";
+
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetOffsetVolume(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("offset_volume", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetOffsetAddedMass(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  for (std::map<gazebo::physics::LinkPtr,
+     gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+     it != models.end(); ++it)
+  {
+    gazebo::HydrodynamicModelPtr hydro = it->second;
+    hydro->SetParam("offset_added_mass", _req.data);
+  }
+  _res.success = true;
+  _res.message = "All links set with new added-mass identity offset";
+
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetOffsetAddedMass(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("offset_added_mass", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetOffsetLinearDamping(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  for (std::map<gazebo::physics::LinkPtr,
+     gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+     it != models.end(); ++it)
+  {
+    gazebo::HydrodynamicModelPtr hydro = it->second;
+    hydro->SetParam("offset_linear_damping", _req.data);
+  }
+  _res.success = true;
+  _res.message = "All links set with new linear damping identity offset";
+
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetOffsetLinearDamping(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("offset_linear_damping", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetOffsetLinearForwardSpeedDamping(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  for (std::map<gazebo::physics::LinkPtr,
+     gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+     it != models.end(); ++it)
+  {
+    gazebo::HydrodynamicModelPtr hydro = it->second;
+    hydro->SetParam("offset_lin_forward_speed_damping", _req.data);
+  }
+  _res.success = true;
+  _res.message = "All links set with new linear forward speed damping identity offset";
+
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetOffsetLinearForwardSpeedDamping(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("offset_lin_forward_speed_damping", _res.data);
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::SetOffsetNonLinearDamping(
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::SetFloat::Response& _res)
+
+{
+  for (std::map<gazebo::physics::LinkPtr,
+     gazebo::HydrodynamicModelPtr>::iterator it = models.begin();
+     it != models.end(); ++it)
+  {
+    gazebo::HydrodynamicModelPtr hydro = it->second;
+    hydro->SetParam("offset_nonlin_damping", _req.data);
+  }
+  _res.success = true;
+  _res.message = "All links set with new nonlinear damping identity offset";
+
+  return true;
+}
+
+/////////////////////////////////////////////////
+bool UnderwaterObjectROSPlugin::GetOffsetNonLinearDamping(
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetFloat::Response& _res)
+
+{
+  models.begin()->second->GetParam("offset_nonlin_damping", _res.data);
   return true;
 }
 

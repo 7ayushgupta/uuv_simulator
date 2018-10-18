@@ -24,19 +24,26 @@
 
 namespace uuv_simulator_ros
 {
+/////////////////////////////////////////////////
 FinROSPlugin::FinROSPlugin()
 {
   this->rosPublishPeriod = gazebo::common::Time(0.05);
   this->lastRosPublishTime = gazebo::common::Time(0.0);
 }
 
+/////////////////////////////////////////////////
 FinROSPlugin::~FinROSPlugin()
 {
+#if GAZEBO_MAJOR_VERSION >= 8
+  this->rosPublishConnection.reset();
+#else
   gazebo::event::Events::DisconnectWorldUpdateBegin(
         this->rosPublishConnection);
+#endif
   this->rosNode->shutdown();
 }
 
+/////////////////////////////////////////////////
 void FinROSPlugin::SetReference(
     const uuv_gazebo_ros_plugins_msgs::FloatStamped::ConstPtr &_msg)
 {
@@ -49,11 +56,13 @@ void FinROSPlugin::SetReference(
   this->inputCommand = _msg->data;
 }
 
+/////////////////////////////////////////////////
 gazebo::common::Time FinROSPlugin::GetRosPublishPeriod()
 {
   return this->rosPublishPeriod;
 }
 
+/////////////////////////////////////////////////
 void FinROSPlugin::SetRosPublishRate(double _hz)
 {
   if (_hz > 0.0)
@@ -62,16 +71,19 @@ void FinROSPlugin::SetRosPublishRate(double _hz)
     this->rosPublishPeriod = 0.;
 }
 
+/////////////////////////////////////////////////
 void FinROSPlugin::Init()
 {
   FinPlugin::Init();
 }
 
+/////////////////////////////////////////////////
 void FinROSPlugin::Reset()
 {
   this->lastRosPublishTime.Set(0, 0);
 }
 
+/////////////////////////////////////////////////
 void FinROSPlugin::Load(gazebo::physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 {
   try {
@@ -112,6 +124,12 @@ void FinROSPlugin::Load(gazebo::physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   this->pubFinForce =
     this->rosNode->advertise<geometry_msgs::WrenchStamped>(wrenchTopic, 10);
 
+  std::stringstream stream;
+  stream << _parent->GetName() << "/fins/" << this->finID <<
+    "/get_lift_drag_params";
+  this->services["get_lift_drag_params"] = this->rosNode->advertiseService(
+    stream.str(), &FinROSPlugin::GetLiftDragParams, this);
+
   gzmsg << "Fin #" << this->finID << " initialized" << std::endl
     << "\t- Link: " << this->link->GetName() << std::endl
     << "\t- Robot model: " << _parent->GetName() << std::endl
@@ -124,6 +142,7 @@ void FinROSPlugin::Load(gazebo::physics::ModelPtr _parent, sdf::ElementPtr _sdf)
         boost::bind(&FinROSPlugin::RosPublishStates, this));
 }
 
+/////////////////////////////////////////////////
 void FinROSPlugin::RosPublishStates()
 {
   // Limit publish rate according to publish period
@@ -143,12 +162,27 @@ void FinROSPlugin::RosPublishStates()
     geometry_msgs::WrenchStamped msg;
     msg.header.stamp = ros::Time().now();
     msg.header.frame_id = this->link->GetName();
-    msg.wrench.force.x = this->finForce.x;
-    msg.wrench.force.y = this->finForce.y;
-    msg.wrench.force.z = this->finForce.z;
+    msg.wrench.force.x = this->finForce.X();
+    msg.wrench.force.y = this->finForce.Y();
+    msg.wrench.force.z = this->finForce.Z();
 
     this->pubFinForce.publish(msg);
   }
+}
+
+/////////////////////////////////////////////////
+bool FinROSPlugin::GetLiftDragParams(
+  uuv_gazebo_ros_plugins_msgs::GetListParam::Request& _req,
+  uuv_gazebo_ros_plugins_msgs::GetListParam::Response& _res)
+{
+  _res.description = this->liftdrag->GetType();
+  for (auto& item : this->liftdrag->GetListParams())
+  {
+    _res.tags.push_back(item.first);
+    _res.data.push_back(item.second);
+  }
+
+  return true;
 }
 
 GZ_REGISTER_MODEL_PLUGIN(FinROSPlugin)

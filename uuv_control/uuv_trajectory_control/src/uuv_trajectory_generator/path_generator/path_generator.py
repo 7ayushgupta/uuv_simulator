@@ -14,13 +14,13 @@
 # limitations under the License.
 
 import rospy
-import scipy
 import numpy as np
 from copy import deepcopy
-from ..waypoint import Waypoint
-from ..waypoint_set import WaypointSet
+from uuv_waypoints import Waypoint, WaypointSet
 from ..trajectory_point import TrajectoryPoint
-from tf.transformations import quaternion_multiply, quaternion_inverse, quaternion_from_euler, quaternion_conjugate, quaternion_about_axis
+from tf.transformations import quaternion_multiply, quaternion_about_axis, \
+    quaternion_from_euler, rotation_matrix, quaternion_from_matrix
+from visualization_msgs.msg import MarkerArray
 
 
 class PathGenerator(object):
@@ -46,6 +46,16 @@ class PathGenerator(object):
 
         self._start_time = None
         self._duration = None
+
+        self._termination_by_time = True
+
+        self._final_pos_tolerance = 0.1
+
+        self._init_rot = quaternion_about_axis(0.0, [0, 0, 1])
+        self._last_rot = quaternion_about_axis(0.0, [0, 0, 1])
+
+        self._markers_msg = MarkerArray()
+        self._marker_id = 0
 
     @staticmethod
     def get_generator(name, *args, **kwargs):
@@ -116,6 +126,10 @@ class PathGenerator(object):
         assert 0 < step < 1
         self._s_step = step
 
+    @property
+    def termination_by_time(self):
+        return self._termination_by_time
+
     def reset(self):
         self._s = list()
         self._segment_to_wp_map = list()
@@ -144,7 +158,7 @@ class PathGenerator(object):
             wps = self._segment_to_wp_map[idx::]
             return np.unique(wps)
         except:
-            print 'Invalid index'
+            rospy.logerr('Invalid index')
             return None
 
     def is_full_dof(self):
@@ -162,6 +176,9 @@ class PathGenerator(object):
     def get_samples(self, max_time, step=0.005):
         raise NotImplementedError()
 
+    def get_visual_markers(self):
+        return self._markers_msg
+
     def add_waypoint(self, waypoint, add_to_beginning=False):
         """Add waypoint to the existing waypoint set. If no waypoint set has
         been initialized, create new waypoint set structure and add the given
@@ -171,18 +188,33 @@ class PathGenerator(object):
         self._waypoints.add_waypoint(waypoint, add_to_beginning)
         return self.init_interpolator()
 
-    def init_waypoints(self, waypoints=None):
+    def init_waypoints(self, waypoints=None, init_rot=np.array([0, 0, 0, 1])):
         if waypoints is not None:
             self._waypoints = deepcopy(waypoints)
 
         if self._waypoints is None:
-            print 'Waypoint list has not been initialized'
+            rospy.logerr('Waypoint list has not been initialized')
             return False
 
-        return self.init_interpolator()
+        self._init_rot = init_rot
+        rospy.loginfo('PathGenerator::Setting initial rotation as=%s',
+                      str(init_rot))
+        return True
 
     def interpolate(self, tag, s):
         return self._interp_fcns[tag](s)
+
+    def is_finished(self, t):
+        if self._termination_by_time:
+            return t > self.max_time
+        else:
+            return True
+
+    def has_started(self, t):
+        if self._termination_by_time:
+            return t - self.start_time > 0
+        else:
+            return True
 
     def generate_pnt(self, s):
         raise NotImplementedError()
@@ -193,14 +225,25 @@ class PathGenerator(object):
     def generate_quat(self, s):
         raise NotImplementedError()
 
+    def set_parameters(self, params):
+        raise NotImplementedError()
+
     def _compute_rot_quat(self, dx, dy, dz):
-        rotq = quaternion_about_axis(
-            np.arctan2(dy, dx),
-            [0, 0, 1])
+        if np.isclose(dx, 0) and np.isclose(dy, 0):
+            rotq = self._last_rot
+        else:
+            heading = np.arctan2(dy, dx)
+            rotq = quaternion_about_axis(heading, [0, 0, 1])
 
         if self._is_full_dof:
             rote = quaternion_about_axis(
                 -1 * np.arctan2(dz, np.sqrt(dx**2 + dy**2)),
                 [0, 1, 0])
             rotq = quaternion_multiply(rotq, rote)
+
+        # Certify that the next quaternion remains in the same half hemisphere
+        d_prod = np.dot(self._last_rot, rotq)
+        if d_prod < 0:
+            rotq *= -1
+
         return rotq

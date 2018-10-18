@@ -14,15 +14,15 @@
 # limitations under the License.
 
 from copy import deepcopy
-from scipy.interpolate import splrep, splev
+from scipy.interpolate import splrep, splev, interp1d
 import numpy as np
-from ..waypoint import Waypoint
-from ..waypoint_set import WaypointSet
+from uuv_waypoints import Waypoint, WaypointSet
 from ..trajectory_point import TrajectoryPoint
 from tf.transformations import quaternion_multiply, quaternion_about_axis
 from line_segment import LineSegment
 from bezier_curve import BezierCurve
 from path_generator import PathGenerator
+from visualization_msgs.msg import MarkerArray
 
 
 class LIPBInterpolator(PathGenerator):
@@ -32,12 +32,12 @@ class LIPBInterpolator(PathGenerator):
     [1] Biagiotti, Luigi, and Claudio Melchiorri. Trajectory planning for
         automatic machines and robots. Springer Science & Business Media, 2008.
     """
-    LABEL = 'lipb_interpolator'
+    LABEL = 'lipb'
 
     def __init__(self):
         super(LIPBInterpolator, self).__init__(self)
 
-        self._radius = 5
+        self._radius = 10
         # Set of interpolation functions for each degree of freedom
         # The heading function interpolates the given heading offset and its
         # value is added to the heading computed from the trajectory
@@ -49,9 +49,12 @@ class LIPBInterpolator(PathGenerator):
         if self._waypoints is None:
             return False
 
+        self._markers_msg = MarkerArray()
+        self._marker_id = 0
+
         self._interp_fcns['pos'] = list()
         self._segment_to_wp_map = [0]
-        
+
         if self._waypoints.num_waypoints == 2:
             self._interp_fcns['pos'].append(
                 LineSegment(self._waypoints.get_waypoint(0).pos,
@@ -63,7 +66,7 @@ class LIPBInterpolator(PathGenerator):
         elif self._waypoints.num_waypoints > 2:
             q_seg = self._waypoints.get_waypoint(0).pos
             q_start_line = q_seg
-            heading = [0]
+            heading = [self._waypoints.get_waypoint(0).heading_offset]
             for i in range(1, self._waypoints.num_waypoints):
                 first_line = LineSegment(q_start_line, self._waypoints.get_waypoint(i).pos)
                 radius = min(self._radius, first_line.get_length() / 2)
@@ -75,23 +78,23 @@ class LIPBInterpolator(PathGenerator):
                     q_seg = np.vstack(
                         (q_seg, first_line.interpolate((first_line.get_length() - radius) / first_line.get_length())))
                     self._interp_fcns['pos'].append(LineSegment(q_start_line, q_seg[-1, :]))
-                    heading.append(0)
+                    heading.append(self._waypoints.get_waypoint(i).heading_offset)
                     self._segment_to_wp_map.append(i)
                 if i == self._waypoints.num_waypoints - 1:
                     q_seg = np.vstack((q_seg, self._waypoints.get_waypoint(i).pos))
                     self._interp_fcns['pos'].append(LineSegment(q_seg[-2, :], q_seg[-1, :]))
-                    heading.append(0)
+                    heading.append(self._waypoints.get_waypoint(i).heading_offset)
                     self._segment_to_wp_map.append(i)
                 elif i + 1 < self._waypoints.num_waypoints:
                     q_seg = np.vstack((q_seg, second_line.interpolate(radius / second_line.get_length())))
                     self._interp_fcns['pos'].append(
                         BezierCurve([q_seg[-2, :], self._waypoints.get_waypoint(i).pos, q_seg[-1, :]], 5))
-                    heading.append(0)
+                    heading.append(self._waypoints.get_waypoint(i).heading_offset)
                     self._segment_to_wp_map.append(i)
                     q_start_line = deepcopy(q_seg[-1, :])
         else:
             return False
-        
+
         # Reparametrizing the curves
         lengths = [seg.get_length() for seg in self._interp_fcns['pos']]
         lengths = [0] + lengths
@@ -111,24 +114,32 @@ class LIPBInterpolator(PathGenerator):
             # Set a simple spline to interpolate heading offset, if existent
             self._heading_spline = splrep(self._s, heading, k=3, per=False)
             self._interp_fcns['heading'] = lambda x: splev(x, self._heading_spline)
-
         return True
 
-    def get_samples(self, max_time, step=0.005):
+    def set_parameters(self, params):
+        if 'radius' in params:
+            assert params['radius'] > 0, 'Radius must be greater than zero'
+            self._radius = params['radius']
+        return True
+
+    def get_samples(self, max_time, step=0.001):
         if self._waypoints is None:
             return None
+        if self._interp_fcns['pos'] is None:
+            return None
         s = np.arange(0, 1 + step, step)
-        t = s * self._duration + self._start_time
 
         pnts = list()
-        for i in range(t.size):
+        for i in s:
             pnt = TrajectoryPoint()
-            pnt.pos = self.generate_pos(s[i]).tolist()
-            pnt.t = t[i]
+            pnt.pos = self.generate_pos(i).tolist()
+            pnt.t = 0.0
             pnts.append(pnt)
         return pnts
 
-    def generate_pos(self, s):
+    def generate_pos(self, s, *args):
+        if self._interp_fcns['pos'] is None:
+            return None
         idx = self.get_segment_idx(s)
         if idx == 0:
             u_k = 0
@@ -138,7 +149,7 @@ class LIPBInterpolator(PathGenerator):
             pos = self._interp_fcns['pos'][idx - 1].interpolate(u_k)
         return pos
 
-    def generate_pnt(self, s, t=0.0):
+    def generate_pnt(self, s, t=0.0, *args):
         pnt = TrajectoryPoint()
         # Trajectory time stamp
         pnt.t = t
@@ -156,6 +167,10 @@ class LIPBInterpolator(PathGenerator):
         if last_s == 0:
             last_s = 0
 
+        if s == 0:
+            self._last_rot = deepcopy(self._init_rot)
+            return self._init_rot
+
         this_pos = self.generate_pos(s)
         last_pos = self.generate_pos(last_s)
         dx = this_pos[0] - last_pos[0]
@@ -163,6 +178,7 @@ class LIPBInterpolator(PathGenerator):
         dz = this_pos[2] - last_pos[2]
 
         rotq = self._compute_rot_quat(dx, dy, dz)
+        self._last_rot = deepcopy(rotq)
 
         # Calculating the step for the heading offset
         q_step = quaternion_about_axis(
@@ -170,5 +186,4 @@ class LIPBInterpolator(PathGenerator):
             np.array([0, 0, 1]))
         # Adding the heading offset to the rotation quaternion
         rotq = quaternion_multiply(rotq, q_step)
-
         return rotq

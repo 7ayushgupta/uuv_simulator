@@ -1,12 +1,20 @@
 *~
 *.pyc
 *.swp
-.clang_complete
+
+# IDEs
+.vscode
 .idea
+.ropeproject
+.imdone
+
+# Misc
+.clang_complete
 smac3-*
 results
 comparative_analysis
 best_results
 scenario_*.txt
-docs
-.vscode
+
+# Documentation
+docs/build

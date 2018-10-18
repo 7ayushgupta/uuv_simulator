@@ -24,6 +24,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, Point, Quaternion
 from uuv_control_msgs.msg import Trajectory, TrajectoryPoint, WaypointSet
 import uuv_trajectory_generator
+import uuv_waypoints
 
 
 class TrajectoryMarkerPublisher:
@@ -47,6 +48,9 @@ class TrajectoryMarkerPublisher:
 
         self._station_keeping_mode_sub = rospy.Subscriber(
             'station_keeping_on', Bool, self._update_station_keeping_mode)
+
+        self._reference_sub = rospy.Subscriber(
+            'reference', TrajectoryPoint, self._reference_callback)
 
         # Waypoint set received
         self._waypoints = None
@@ -74,6 +78,9 @@ class TrajectoryMarkerPublisher:
         self._waypoint_path_pub = rospy.Publisher(
             'waypoint_path_marker', Path, queue_size=1)
 
+        self._reference_marker_pub = rospy.Publisher(
+            'reference_marker', Marker, queue_size=1)
+
         self._update_markers_timer = rospy.Timer(
             rospy.Duration(0.5), self._update_markers)
 
@@ -93,6 +100,7 @@ class TrajectoryMarkerPublisher:
             marker.action = 3
         else:
             waypoint_path_marker = self._waypoints.to_path_marker()
+            waypoint_path_marker.header.frame_id = self._waypoints.inertial_frame_id
             waypoint_marker = self._waypoints.to_marker_list()
 
         self._waypoint_path_pub.publish(waypoint_path_marker)
@@ -103,9 +111,11 @@ class TrajectoryMarkerPublisher:
         traj_marker.header.frame_id = 'world'
 
         if self._trajectory is not None:
+            traj_marker.header.frame_id = self._trajectory.header.frame_id
             for pnt in self._trajectory.points:
                 p_msg = PoseStamped()
                 p_msg.header.stamp = pnt.header.stamp
+                p_msg.header.frame_id = self._trajectory.header.frame_id
                 p_msg.pose = pnt.pose
                 traj_marker.poses.append(p_msg)
 
@@ -116,7 +126,7 @@ class TrajectoryMarkerPublisher:
         self._trajectory = msg
 
     def _update_waypoints(self, msg):
-        self._waypoints = uuv_trajectory_generator.WaypointSet()
+        self._waypoints = uuv_waypoints.WaypointSet()
         self._waypoints.from_message(msg)
 
     def _update_auto_mode(self, msg):
@@ -127,6 +137,26 @@ class TrajectoryMarkerPublisher:
 
     def _update_traj_tracking_mode(self, msg):
         self._is_traj_tracking_on = msg.data
+
+    def _reference_callback(self, msg):
+        marker = Marker()
+        marker.header.stamp = rospy.Time.now()
+        marker.header.frame_id = msg.header.frame_id
+        marker.id = 0
+        marker.type = Marker.SPHERE
+        marker.action = Marker.MODIFY
+
+        marker.pose.position = msg.pose.position
+        marker.scale.x = 0.3
+        marker.scale.y = 0.3
+        marker.scale.z = 0.3
+
+        marker.color.a = 1.0
+        marker.color.r = 0.0
+        marker.color.g = 1.0
+        marker.color.b = 0.0
+
+        self._reference_marker_pub.publish(marker)
 
 if __name__ == '__main__':
     print('Starting trajectory and waypoint marker publisher')

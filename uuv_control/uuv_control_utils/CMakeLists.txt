@@ -1,17 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(uuv_control_utils)
 
-find_package(catkin REQUIRED COMPONENTS
-        rospy
-        gazebo_msgs
-        geometry_msgs
-        uuv_world_ros_plugins_msgs
-        uuv_gazebo_ros_plugins_msgs
-        uuv_control_msgs
-        std_msgs
-        visualization_msgs
-        nav_msgs
-        uuv_trajectory_control)
+find_package(catkin REQUIRED)
 
 catkin_package()
 
@@ -24,6 +14,8 @@ catkin_install_python(PROGRAMS scripts/set_timed_current_perturbation.py
                                scripts/trajectory_marker_publisher.py
                                scripts/set_thruster_output_efficiency.py
                                scripts/send_waypoint_file.py
+                               scripts/set_gm_current_perturbation.py
+                               scripts/set_scalar_parameter.py
                       DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY launch config

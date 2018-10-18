@@ -49,7 +49,7 @@ class HydrodynamicModel : public BuoyantObject
 
   /// \brief Computation of the hydrodynamic forces
   public: virtual void ApplyHydrodynamicForces(
-    double time, const math::Vector3 &_flowVelWorld) = 0;
+    double time, const ignition::math::Vector3d &_flowVelWorld) = 0;
 
   /// \brief Prints parameters
   public: virtual void Print(std::string _paramName,
@@ -63,6 +63,9 @@ class HydrodynamicModel : public BuoyantObject
   public: virtual bool GetParam(std::string _tag,
     double& _output) = 0;
 
+  /// \brief Set a scalar parameters
+  public: virtual bool SetParam(std::string _tag, double _input) = 0;
+
   /// \brief Filter acceleration (fix due to the update structure of Gazebo)
   protected: void ComputeAcc(Eigen::Vector6d _velRel,
                             double _time,
@@ -72,10 +75,10 @@ class HydrodynamicModel : public BuoyantObject
   protected: bool CheckParams(sdf::ElementPtr _sdf);
 
   /// \brief Convert vector to comply with the NED reference frame
-  protected: math::Vector3 ToNEDConvention(math::Vector3 _vec);
+  protected: ignition::math::Vector3d ToNED(ignition::math::Vector3d _vec);
 
   /// \brief Convert vector to comply with the NED reference frame
-  protected: math::Vector3 FromNEDConvention(math::Vector3 _vec);
+  protected: ignition::math::Vector3d FromNED(ignition::math::Vector3d _vec);
 
   /// \brief Filtered linear & angular acceleration vector in link frame.
   /// This is used to prevent the model to become unstable given that Gazebo
@@ -164,8 +167,11 @@ class HMFossen : public HydrodynamicModel
   public: virtual bool GetParam(std::string _tag,
                                 std::vector<double>& _output);
 
-  /// \brief Return paramater in vector form for the given tag
+  /// \brief Return paramater in scalar form for the given tag
   public: virtual bool GetParam(std::string _tag, double& _output);
+
+  /// \brief Set scalar parameter
+  public: virtual bool SetParam(std::string _tag, double _input);
 
   /// \brief Register this model with the factory.
   protected: REGISTER_HYDRODYNAMICMODEL(HMFossen);
@@ -177,7 +183,7 @@ class HMFossen : public HydrodynamicModel
 
   /// \brief Computation of the hydrodynamic forces
   public: virtual void ApplyHydrodynamicForces(double time,
-                            const math::Vector3 &_flowVelWorld);
+                            const ignition::math::Vector3d &_flowVelWorld);
 
   /// \brief Computes the added-mass Coriolis matrix Ca.
   protected: void ComputeAddedCoriolisMatrix(const Eigen::Vector6d& _vel,
@@ -188,14 +194,35 @@ class HMFossen : public HydrodynamicModel
   protected: void ComputeDampingMatrix(const Eigen::Vector6d& _vel,
                                        Eigen::Matrix6d &_D) const;
 
+  /// \brief Returns the added-mass matrix with the scaling and offset
+  protected: Eigen::Matrix6d GetAddedMass() const;
+
   /// \brief Added-mass matrix
   protected: Eigen::Matrix6d Ma;
+
+  /// \brief Scaling of the added-mass matrix
+  protected: double scalingAddedMass;
+
+  /// \brief Offset for the added-mass matrix
+  protected: double offsetAddedMass;
 
   /// \brief Added-mass associated Coriolis matrix
   protected: Eigen::Matrix6d Ca;
 
   /// \brief Damping matrix
   protected: Eigen::Matrix6d D;
+
+  /// \brief Scaling of the damping matrix
+  protected: double scalingDamping;
+
+  /// \brief Offset for the linear damping matrix
+  protected: double offsetLinearDamping;
+
+  /// \brief Offset for the linear damping matrix
+  protected: double offsetLinForwardSpeedDamping;
+
+  /// \brief Offset for the linear damping matrix
+  protected: double offsetNonLinDamping;
 
   /// \brief Linear damping matrix
   protected: Eigen::Matrix6d DLin;

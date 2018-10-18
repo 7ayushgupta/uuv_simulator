@@ -9,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   uuv_gazebo_ros_plugins_msgs
   roscpp
   visualization_msgs
+  tf2_ros
+  tf2
 )
 
 find_package(gazebo REQUIRED)
@@ -94,3 +96,16 @@ install(DIRECTORY include/${PROJECT_NAME}/
 install(DIRECTORY urdf
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
         PATTERN "*~" EXCLUDE)
+
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest)
+  find_package(xacro)
+  find_package(rosunit)
+  foreach(T
+      test/test_default_fossen_vehicle.test
+      test/test_sphere_vehicle.test
+      test/test_thrusters.test
+      )
+     add_rostest(${T})
+  endforeach()
+endif()
