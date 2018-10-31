@@ -42,8 +42,8 @@
   </link>
   <gazebo reference="niot_material">
     <material>Gazebo/Blue</material>
-</gazebo>
-<gazebo>
-<static>true</static>
-</gazebo>
+  </gazebo>
+  <gazebo>
+    <static>true</static>
+  </gazebo>
 </robot>
