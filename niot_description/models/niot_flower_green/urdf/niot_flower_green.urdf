@@ -1,20 +1,20 @@
 <robot
-  name="niot_path">
+  name="niot_flower_green">
   <link
     name="base_link">
     <inertial>
       <origin
-        xyz="0.62423 0.5129 0.12828"
+        xyz="0.064213 2.1312 0.17313"
         rpy="0 0 0" />
       <mass
-        value="2.5722" />
+        value="7.2406" />
       <inertia
-        ixx="0.092857"
-        ixy="1.3878E-17"
-        ixz="-5.4794E-18"
-        iyy="0.18998"
-        iyz="-3.0109E-18"
-        izz="0.28283" />
+        ixx="1.6342"
+        ixy="-1.1134E-17"
+        ixz="-2.6353E-34"
+        iyy="5.6259E-33"
+        iyz="4.0953E-17"
+        izz="1.6342" />
     </inertial>
     <visual>
       <origin
@@ -22,7 +22,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://niot_path/meshes/base_link.STL" />
+          filename="package://niot_flower_green/meshes/base_link.STL" />
       </geometry>
       <material
         name="niot_material">
@@ -36,14 +36,14 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://niot_path/meshes/base_link.STL" />
+          filename="package://niot_flower_green/meshes/base_link.STL" />
       </geometry>
     </collision>
   </link>
   <gazebo reference="niot_material">
     <material>Gazebo/Blue</material>
-</gazebo>
-<gazebo>
-<static>true</static>
-</gazebo>
+  </gazebo>
+  <gazebo>
+    <static>true</static>
+  </gazebo>
 </robot>

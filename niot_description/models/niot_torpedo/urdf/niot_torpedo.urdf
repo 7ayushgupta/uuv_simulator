@@ -1,20 +1,20 @@
 <robot
-  name="niot_path">
+  name="niot_torpedo">
   <link
     name="base_link">
     <inertial>
       <origin
-        xyz="0.62423 0.5129 0.12828"
+        xyz="0.092871 0.37499 0.12629"
         rpy="0 0 0" />
       <mass
-        value="2.5722" />
+        value="11.226" />
       <inertia
-        ixx="0.092857"
-        ixy="1.3878E-17"
-        ixz="-5.4794E-18"
-        iyy="0.18998"
-        iyz="-3.0109E-18"
-        izz="0.28283" />
+        ixx="0.58018"
+        ixy="1.6526E-16"
+        ixz="-1.8857E-19"
+        iyy="6.3839E-07"
+        iyz="0.00056597"
+        izz="0.58018" />
     </inertial>
     <visual>
       <origin
@@ -22,7 +22,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://niot_path/meshes/base_link.STL" />
+          filename="package://niot_torpedo/meshes/base_link.STL" />
       </geometry>
       <material
         name="niot_material">
@@ -36,14 +36,14 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://niot_path/meshes/base_link.STL" />
+          filename="package://niot_torpedo/meshes/base_link.STL" />
       </geometry>
     </collision>
   </link>
   <gazebo reference="niot_material">
     <material>Gazebo/Blue</material>
-</gazebo>
-<gazebo>
-<static>true</static>
-</gazebo>
+  </gazebo>
+  <gazebo>
+    <static>true</static>
+  </gazebo>
 </robot>
