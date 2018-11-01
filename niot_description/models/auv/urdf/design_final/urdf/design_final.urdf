@@ -1,0 +1,51 @@
+<robot
+  name="design_final">
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="0.042649 -0.16426 0.02957"
+        rpy="0 0 0" />
+      <mass
+        value="17.822" />
+      <inertia
+        ixx="0.36543"
+        ixy="-0.067627"
+        ixz="-0.00060658"
+        iyy="1.0152"
+        iyz="6.8463E-05"
+        izz="0.83857" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://auv/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89804 0.91765 0.92941 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://auv/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <plugin name="AUVPlugin" filename="libAUVPlugin.so">
+  </plugin>
+    <gazebo reference="base_link">
+    <material>Gazebo/Grey</material>
+</gazebo>
+<gazebo>
+<static>true</static>
+</gazebo>
+</robot>
