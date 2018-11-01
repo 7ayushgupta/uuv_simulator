@@ -43,63 +43,63 @@
 
     <!-- Bounding box with sea surface -->
     <include>
-      <uri>model://ocean_box</uri>
+      <uri>model://niot_ocean_box</uri>
       <pose>0 0 0 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_path</uri>
-      <pose>0 2 0 0 0 -1.57</pose>
+      <pose>2 0 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_flower_red</uri>
-      <pose>0 5 0 0 0 0 </pose>
+      <pose>5 0 -3 0 0 0 </pose>
     </include>
 
     <include>
       <uri>model://niot_flower_yellow</uri>
-      <pose>2.25 7 0 0 0 0</pose>
+      <pose>7 2.25 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_flower_green</uri>
-      <pose>-2.25 7 0 0 0 0</pose>
+      <pose>7 -2.25 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_path</uri>
-      <pose>0 9 0 0 0 -1.57</pose>
+      <pose>9 0 -3 0 0 -1.57</pose>
     </include>
 
     <include>
       <uri>model://niot_gate</uri>
-      <pose>2.5 13 0 0 0 0</pose>
+      <pose>13 2.5 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_torpedo</uri>
-      <pose>4.5 15 0 0 0 0</pose>
+      <pose>15 4.5 -3 0 0 0</pose>
     </include>
 
      <include>
       <uri>model://niot_candy</uri>
-      <pose>8 18 0 0 0 0</pose>
+      <pose>18 8 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_bins</uri>
-      <pose>-4.5 15 0 0 0 0</pose>
+      <pose>15 -4.5 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_path</uri>
-      <pose>-2.5 13 0 0 0 0</pose>
+      <pose>13 -2.5 -3 0 0 0</pose>
     </include>
 
     <include>
       <uri>model://niot_path</uri>
-      <pose>2.5 13 0 0 0 0</pose>
+      <pose>13 2.5 -3 0 0 0</pose>
     </include>
 
     <plugin name="underwater_current_plugin" filename="libuuv_underwater_current_ros_plugin.so">
