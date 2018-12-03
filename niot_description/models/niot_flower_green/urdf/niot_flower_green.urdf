@@ -25,7 +25,7 @@
           filename="package://niot_flower_green/meshes/base_link.STL" />
       </geometry>
       <material
-        name="niot_material">
+        name="">
         <color
           rgba="0.79216 0.81961 0.93333 1" />
       </material>
@@ -40,8 +40,8 @@
       </geometry>
     </collision>
   </link>
-  <gazebo reference="niot_material">
-    <material>Gazebo/Blue</material>
+  <gazebo reference="base_link">
+    <material>Gazebo/Green</material>
   </gazebo>
   <gazebo>
     <static>true</static>

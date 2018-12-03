@@ -398,7 +398,19 @@
       </geometry>
     </collision>
   </link>
- 
+  <joint
+    name="east_joint"
+    type="fixed">
+    <origin
+      xyz="-0.00295011291907577 0.0748526601695768 -0.30691889078886"
+      rpy="-6.12319392837392E-17 0.00727776166092887 -4.45627526281709E-19" />
+    <parent
+      link="base_link" />
+    <child
+      link="east" />
+    <axis
+      xyz="0 0 0" />
+  </joint>
   <link
     name="west">
     <inertial>
