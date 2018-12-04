@@ -103,6 +103,7 @@ catkin_package(
 #  LIBRARIES niot_description
 #  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
+    CATKIN_DEPENDS uuv_gazebo_ros_plugins
 )
 
 ###########
@@ -113,7 +114,8 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
 # include
-# ${catkin_INCLUDE_DIRS}
+    ${catkin_INCLUDE_DIRS}
+    
 )
 
 ## Declare a C++ library

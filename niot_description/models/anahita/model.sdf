@@ -568,6 +568,13 @@
          <robotNamespace>Anahita</robotNamespace>
          <bodyName>imu</bodyName>
       </plugin>
+
+      <plugin name="uuv_plugin" filename="libunderwater_object_ros_plugin.so">
+        <fluid_density>1028.0</fluid_density>
+        <flow_velocity_topic>hydrodynamics/current_velocity</flow_velocity_topic>
+        <!-- Adding the hydrodynamic and hydrostatic parameters for the vehicle-->
+      </plugin>
+      
        <!-- <plugin name="Dynamics" filename="libDynamics.so">
       </plugin> -->
    </model>
